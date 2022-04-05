@@ -3,14 +3,14 @@
 
 #include <QThread>
 #include <string>
-class SniffThread : public QThread
-{
-    Q_OBJECT
+class SniffThread : public QThread {
+  Q_OBJECT
 private:
-    std::string adapter_name;
+  std::string adapter_name;
+
 public:
-    explicit SniffThread(QString name,QObject *parent = nullptr);
-    void run()override;
+  explicit SniffThread(QString name, QObject *parent = nullptr);
+  void run() override;
 };
 
 #endif // SNIFFTHREAD_H
