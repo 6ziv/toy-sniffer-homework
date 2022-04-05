@@ -1,0 +1,6 @@
+[submodule "QHexView"]
+	path = QHexView
+	url = https://github.com/virinext/QHexView.git
+[submodule "span_ext"]
+	path = span_ext
+	url = https://github.com/brevzin/span_ext.git
