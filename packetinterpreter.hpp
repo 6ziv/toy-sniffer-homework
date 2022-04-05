@@ -387,20 +387,20 @@ namespace PacketInterpreter
             if(this->protocol == IPV4  || this->protocol == IPV6){
                 if(opcode&1){
                     if(*reinterpret_cast<const uint32_t*>(sender_protocol_address) == *reinterpret_cast<const uint32_t*>(receiver_protocol_address))
-                        return QCoreApplication::translate("ARP","ARP Announcement for %1").arg(addr2Str(get_protocol_source()));
+                        return QString("ARP Announcement for %1").arg(addr2Str(get_protocol_source()));
                     else
-                        return QCoreApplication::translate("ARP","Who has %1? Tell %2.").arg(
+                        return QString("Who has %1? Tell %2.").arg(
                                     addr2Str(get_protocol_destination()),
                                     addr2Str(get_protocol_source())
                                     );
                 }else{
-                    return QCoreApplication::translate("ARP","%1 is at %2.").arg(
+                    return QString("%1 is at %2.").arg(
                                 addr2Str(get_protocol_source()),
                                 addr2Str(get_physical_source())
                                 );
                 }
             }else{
-                return QCoreApplication::translate("ARP","Unknown protocol type");
+                return QString("Unknown protocol type");
             }
         }
         inline COMMONADDR get_physical_source()const{
