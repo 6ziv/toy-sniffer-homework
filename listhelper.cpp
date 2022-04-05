@@ -1,5 +1,6 @@
-#include <Iphlpapi.h>
 #include <Windows.h>
+#include <ntddndis.h>
+#include <Iphlpapi.h>
 #include <pcap.h>
 
 #include <boost/phoenix/core.hpp>
