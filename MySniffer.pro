@@ -19,7 +19,9 @@ HEADERS += \
     adapterselector.h \
     addresstranslator.hpp \
     endian.hpp \
+    fieldnames.hpp \
     filter.hpp \
+    filterhelper.hpp \
     headerformats.hpp \
     listhelper.h \
     mainwindow.h \

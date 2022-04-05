@@ -6,6 +6,8 @@
 #include <QWidget>
 #include <optional>
 #include <vector>
+#include <bitset>
+class AbstractFilter;
 class MainWindow : public QWidget {
   Q_OBJECT
 private:
@@ -13,8 +15,9 @@ private:
   std::optional<unsigned long long> base_time;
   std::vector<std::tuple<unsigned long long, unsigned long long, QByteArray>>
       packets;
-
+  std::bitset<69> mask;
 public:
+  AbstractFilter* filter;
   std::vector<uint32_t> stream_id;
   explicit MainWindow(QWidget *parent = nullptr);
 public slots:

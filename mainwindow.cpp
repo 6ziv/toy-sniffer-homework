@@ -14,9 +14,11 @@
 #include <QSplitter>
 #include <QVBoxLayout>
 #include <optional>
+#include "filter.hpp"
 MainWindow::MainWindow(QWidget *parent) : QWidget{parent} {
   this->resize(1200, 800);
   this->show();
+  this->filter=nullptr;
   this->setWindowTitle(tr("MySniffer: Adapter Selection."));
   AdapterSelector *selector = new AdapterSelector(this);
   selector->show();
@@ -27,7 +29,8 @@ void MainWindow::packetArrival(long ts_sec, long ts_usec,
       static_cast<unsigned long long>(ts_sec) * 1000000 + ts_usec;
   if (!base_time.has_value())
     base_time = timestamp;
-  int id = table->rowCount();
+
+  uint64_t id = packets.size();
   table->insertRow(id);
   table->setItem(
       id, 0, new QTableWidgetItem(QString::number(id), QTableWidgetItem::Type));
@@ -56,6 +59,14 @@ void MainWindow::packetArrival(long ts_sec, long ts_usec,
   packets.emplace_back(timestamp, total_len, data);
 
   stream_id.push_back(Tracer::trace(packet));
+
+  if(filter){
+    FilterContext * ctx= new FilterContext(reinterpret_cast<const PacketInterpreter::EthernetPacket *>(data.data()),packets.size(),timestamp-base_time.value(),mask);
+    bool show=filter->filter(ctx);
+    delete ctx;
+    if(!show)
+      table->setRowHidden(id,true);
+    }
 }
 void MainWindow::raiseError(QString text) {
   QMessageBox msgbox(QMessageBox::Critical, tr("Error"), text, QMessageBox::Ok,
@@ -67,6 +78,8 @@ void MainWindow::startCapture(QString friendly_name, QString adapter) {
   base_time.reset();
   packets.clear();
 
+  for(int i=0;i<69;i++)
+      if(mask[i])qDebug()<<"ACCESSED:"<<i;
   QLineEdit *display_filter = new QLineEdit(this);
   display_filter->setGeometry(20, 5, this->width() - 150, 20);
   display_filter->show();
@@ -169,4 +182,29 @@ void MainWindow::startCapture(QString friendly_name, QString adapter) {
             hex_view->clear();
             hex_view->setData(new QHexView::DataStorageArray(ref_data));
           });
+
+  connect(apply_filter,&QPushButton::clicked,this,[this,display_filter](){
+      filter = compile(display_filter->text().toStdString());
+      if(filter){
+          display_filter->setStyleSheet("background-color:rgba(200,255,200,255)");
+
+      mask.reset();
+      filter->prepare(mask);
+      for(uint64_t i=0;i<packets.size();i++){
+        FilterContext * ctx= new FilterContext(
+                    reinterpret_cast<const PacketInterpreter::EthernetPacket *>(std::get<2>(packets[i]).data()),i,std::get<0>(packets[i])-base_time.value(),mask);
+        bool show=filter->filter(ctx);
+        delete ctx;
+        if(!show)
+            table->setRowHidden(i,true);
+        else table->setRowHidden(i,false);
+      }
+      }else{
+          display_filter->setStyleSheet("background-color:rgba(255,200,200,255)");
+          for(uint64_t i=0;i<table->rowCount();i++)table->showRow(i);
+      }
+      if(display_filter->text().isEmpty()){
+          display_filter->setStyleSheet("background-color:rgba(255,255,255,255)");
+      }
+  });
 }

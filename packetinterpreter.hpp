@@ -43,7 +43,7 @@ namespace PacketInterpreter {
 typedef boost::property_tree::basic_ptree<std::wstring,
                                           std::tuple<QString, size_t, size_t>>
     my_ptree;
-class UDPPacket : private UDPHeader {
+class UDPPacket : public UDPHeader {
 public:
   inline QString get_comment() const {
     return QString::number(native_to_big(this->src_port)) +
@@ -89,7 +89,7 @@ public:
   inline size_t header_size() const { return sizeof(*this); }
 };
 
-class TCPPacket : private TCPHeader {
+class TCPPacket : public TCPHeader {
 public:
   inline QString get_comment2(uint16_t packet_size) const {
     return QString::number(native_to_big(this->src_port)) +
@@ -208,7 +208,7 @@ public:
 };
 
 class ICMPPacket;
-class IPv4Packet : private Ipv4Header {
+class IPv4Packet : public Ipv4Header {
 public:
   inline COMMONADDR get_source() const {
     return COMMONADDR(reinterpret_cast<const uint8_t *>(saddr),
@@ -330,7 +330,7 @@ public:
   }
 };
 
-class IPv6Packet : private IPv6Header {
+class IPv6Packet : public IPv6Header {
 private:
   static QString ipv6_uint16_tostr(const uint16_t &x);
 
@@ -431,7 +431,7 @@ public:
                : nullptr;
   }
 };
-class ARPPacket : private ARPHeader {
+class ARPPacket : public ARPHeader {
 public:
   static constexpr uint8_t ARP_REQUEST = 1;
   static constexpr uint8_t ARP_REPLY = 2;
@@ -563,7 +563,7 @@ class RARPPacket;
 class SNMPPacket;
 class IEEE802_1QPacket;
 class IEEE802_1XPacket;
-class EthernetPacket : private EthernetHeader {
+class EthernetPacket : public EthernetHeader {
 public:
   inline const uint8_t *getload() const {
     return reinterpret_cast<const uint8_t *>(this + 1);
@@ -611,7 +611,7 @@ public:
       return get_as<ARPPacket>()->get_comment();
     return nullptr;
   }
-  inline uint16_t get_type() const { return this->type; }
+  inline uint16_t get_type() const { return native_to_big(this->type); }
 
   std::deque<std::pair<std::wstring, my_ptree>>
   get_details(size_t offset = 0) const {
@@ -619,7 +619,7 @@ public:
     PacketInterpreter::my_ptree tree;
     TREE_ADD(Destination, addr2Str(get_destination()), dest);
     TREE_ADD(Source, addr2Str(get_source()), src);
-    TREE_ADD(Type, type_tag(get_type()), type);
+    TREE_ADD(Type, type_tag(this->type), type);
     if (get_as<IPv4Packet>())
       ret = get_as<IPv4Packet>()->get_details(offset + sizeof(EthernetHeader));
     if (get_as<IPv6Packet>())
