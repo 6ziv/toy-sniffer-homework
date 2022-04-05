@@ -4,6 +4,7 @@
 #include <QTranslator>
 #include <QListWidget>
 #include <QListWidgetItem>
+#include <QMessageBox>
 #include "listhelper.h"
 #include <pcap.h>
 
@@ -27,6 +28,10 @@ AdapterSelector::AdapterSelector(QWidget* parent):
 
     auto adapters = ListHelper::list_adapters();
 
+    if(adapters.empty()){
+        QMetaObject::invokeMethod(this->parent(),"raiseError",Qt::DirectConnection,Q_ARG(QString,tr("Failed to list adapters")));
+        return;
+    }
     for(const auto& adapter:adapters.keys()){
         QListWidgetItem* item=new QListWidgetItem(list);
         item->setSizeHint(QSize(950,25));
@@ -42,19 +47,26 @@ AdapterSelector::AdapterSelector(QWidget* parent):
         list->addItem(item);
         list->setItemWidget(item,w);
 
-        item->setData(Qt::UserRole,QString::fromStdString(adapters[adapter]));
+
+        item->setData(
+                    Qt::UserRole,
+                    QStringList({adapter,QString::fromStdString(adapters[adapter])})
+        );
     }
     for(int i=0;i<adapters.size();i++){
         workers.push_back(new StatThread(adapters.values()[i],i,this));
         workers.back()->start();
     }
     connect(list,&QListWidget::itemDoubleClicked,this,[this](QListWidgetItem *item){
-        qDebug()<<"Selected:"<<item->data(Qt::UserRole);
+        //qDebug()<<"Selected:"<<item->data(Qt::UserRole);
+        StatThread::is_finished = true;
         for(auto worker:workers){
-            worker->is_finished = -1;
             worker->wait();
         }
+        auto data = item->data(Qt::UserRole).toStringList();
+        QMetaObject::invokeMethod(this->parent(),"startCapture",Qt::DirectConnection,Q_ARG(QString,data[0]),Q_ARG(QString,data[1]));
         this->deleteLater();
+
     });
 }
 void AdapterSelector::update(int id,unsigned long long  bps,unsigned long long  time){

@@ -1,6 +1,5 @@
 QT       += core gui charts
 greaterThan(QT_MAJOR_VERSION, 4): QT += widgets
-
 CONFIG += c++2a
 # You can make your code fail to compile if it uses deprecated APIs.
 # In order to do so, uncomment the following line.
@@ -10,15 +9,28 @@ SOURCES += \
     listhelper.cpp \
     main.cpp \
     mainwindow.cpp \
+    protocols.cpp \
+    qt-collapsible-section/Section.cpp \
+    sniffthread.cpp \
     statplot.cpp \
-    statthread.cpp
-
+    statthread.cpp \
+    QHexView/src/QHexView.cpp
 HEADERS += \
     adapterselector.h \
+    addresstranslator.hpp \
+    endian.hpp \
+    filter.hpp \
+    headerformats.hpp \
     listhelper.h \
     mainwindow.h \
+    packetinterpreter.hpp \
+    protocols.h \
+    qt-collapsible-section/Section.h \
+    sniffthread.h \
     statplot.h \
-    statthread.h
+    statthread.h \
+    QHexView/include/QHexView.h \
+    tracer.hpp
 DEFINES += WIN32_LEAN_AND_MEAN NOMINMAX
 QMAKE_LFLAGS_WINDOWS += "/MANIFESTUAC:\"level='requireAdministrator' uiAccess='false'\""
 
@@ -29,6 +41,8 @@ CONFIG += embed_translations
 INCLUDEPATH += E:\npcap-sdk-1.12\Include
 INCLUDEPATH += C:\boost_1_78_0
 INCLUDEPATH += D:\aixlog-1.5.0\include
+INCLUDEPATH += QHexView/include
+INCLUDEPATH += span_ext/include
 LIBPATH += E:\npcap-sdk-1.12\Lib\x64
 LIBS += Packet.lib wpcap.lib
 LIBS += Iphlpapi.lib

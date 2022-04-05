@@ -3,6 +3,7 @@
 #include "qdebug.h"
 #include "adapterselector.h"
 #include <numeric>
+std::atomic_bool StatThread::is_finished = false;
 StatThread::StatThread(std::string adapter_name,int id,QObject* p)
     :QThread(p),name(adapter_name),adapter_id(id)
 {}
@@ -17,17 +18,16 @@ struct UData{
     unsigned long long old_timestamp;
     unsigned long long starttime;
     bool initialized;
-    int* finished;
     pcap_t *pcap;
     int id;
 
 };
-void dispatcher_handler(u_char *state,
+void dispatcher_handler_stat(u_char *state,
   const struct pcap_pkthdr *header,
   const u_char *pkt_data)
 {
     UData *user_data=reinterpret_cast<UData*>(state);
-    if((*(user_data->finished))!=0)pcap_breakloop(user_data->pcap);
+    if(StatThread::is_finished)pcap_breakloop(user_data->pcap);
 
     unsigned long long current_timestamp = timeval_to_ulonglong(&header->ts);
     if(!user_data->initialized){
@@ -55,8 +55,8 @@ void dispatcher_handler(u_char *state,
 
 void StatThread::run(){
 
-    char errbuf[256];
-    pcap_t *p = pcap_open_live(name.c_str(),100,0,100,errbuf);
+    char errbuf[PCAP_ERRBUF_SIZE];
+    pcap_t *p = pcap_open_live(name.c_str(),BUFSIZ,0,100,errbuf);
     pcap_setmode(p,MODE_STAT);
 
     is_finished = 0;
@@ -65,9 +65,8 @@ void StatThread::run(){
     data.id = this->adapter_id;
     data.obj = this->parent();
     data.initialized = false;
-    data.finished = &is_finished;
     data.pcap = p;
 
-    pcap_loop(p, 0, dispatcher_handler, (PUCHAR)&data);
+    pcap_loop(p, -1, dispatcher_handler_stat, (PUCHAR)&data);
     pcap_close(p);
 }
