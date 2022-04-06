@@ -11,6 +11,7 @@
 #include "filterhelper.hpp"
 #include "packetinterpreter.hpp"
 #include "fieldnames.hpp"
+namespace Filter{
 using namespace PacketInterpreter;
 const std::string known_protocols[] = {"ethernet", "ipv4", "ipv6",
                                        "arp",      "tcp",  "udp"};
@@ -137,17 +138,30 @@ class FilterContext
         }
         return std::monostate();
     }
+    template<>
+    inline FilterValue lookup<ICMPPacket>(uint8_t type){
+        if(icmp_header==nullptr)return std::monostate();
+        switch(type){
+        case 73:return true;
+        case 74:return icmp_header->type;
+        case 75:return icmp_header->subtype;
+        case 76:return native_to_big(icmp_header->checksum);
+        case 77:return native_to_big(icmp_header->rest_of_header);
+        }
+        return std::monostate();
+    }
     const ARPPacket* arp_header=nullptr;
     const IPv4Packet* ipv4_header=nullptr;
     const IPv6Packet* ipv6_header=nullptr;
     const TCPPacket* tcp_header=nullptr;
     const UDPPacket* udp_header=nullptr;
+    const ICMPPacket* icmp_header=nullptr;
     const EthernetPacket* ethernet_header=nullptr;
     std::map<uint8_t,FilterValue> data;
 
     uint64_t no,timestamp;
 public:
-    FilterContext(const EthernetPacket* p,uint64_t id,uint64_t ts,const std::bitset<69>& mask):
+    FilterContext(const EthernetPacket* p,uint64_t id,uint64_t ts/*,const std::bitset<count_fieldnames>& mask*/):
         ethernet_header(p),no(id),timestamp(ts)
     {
         arp_header = ethernet_header->get_as<ARPPacket>();
@@ -155,7 +169,8 @@ public:
         ipv6_header = ethernet_header->get_as<IPv6Packet>();
         tcp_header = ethernet_header->get_as<TCPPacket>();
         udp_header = ethernet_header->get_as<UDPPacket>();
-
+        icmp_header = ethernet_header->get_as<ICMPPacket>();
+    /*
         if(mask[0])data[0]=id;
         if(mask[1])data[1]=ts;
 
@@ -165,7 +180,7 @@ public:
         if(ipv6_header)for(int i=32;i<44;i++)if(mask[i])data.emplace(i,lookup<IPv6Packet>(i));
         if(udp_header)for(int i=44;i<50;i++)if(mask[i])data.emplace(i,lookup<UDPPacket>(i));
         if(tcp_header)for(int i=50;i<69;i++)if(mask[i])data.emplace(i,lookup<TCPPacket>(i));
-
+        */
     };
     inline FilterValue getVal(uint8_t type)
     {
@@ -177,10 +192,18 @@ public:
         if(type<44)return lookup<IPv6Packet>(type);
         if(type<50)return lookup<UDPPacket>(type);
         if(type<69)return lookup<TCPPacket>(type);
+        if(type==69)return (ethernet_header->get_as<RARPPacket>()!=nullptr);
+        if(type==70)return (ethernet_header->get_as<SNMPPacket>()!=nullptr);
+        if(type==71)return (ethernet_header->get_as<IEEE802_1QPacket>()!=nullptr);
+        if(type==72)return (ethernet_header->get_as<IEEE802_1XPacket>()!=nullptr);
+        if(type==73)return (ethernet_header->get_as<ICMPPacket>()!=nullptr);
+        if(type==73)return (ethernet_header->get_as<ICMPPacket>()!=nullptr);
+        if(type<78)return lookup<ICMPPacket>(type);
         return std::monostate();
 /*
  * this should be faster in theory
  * but seems I've made a faulty implementation
+ * so finally I decided not to cache anything.
         qDebug()<<"GETVAL:";
         if(!data.contains(type))return std::monostate();
         qDebug()<<std::get<std::vector<uint8_t>>(this->data[type]).size();
@@ -223,16 +246,15 @@ struct FValue
     }
 };
 struct AbstractFilter{
-    virtual void prepare(std::bitset<69> &x)const =0;
+    //virtual void prepare(std::bitset<69> &x)const =0;
     virtual bool filter(FilterContext *ctx)const = 0;
     virtual ~AbstractFilter(){}
 };
 struct AndFilter:AbstractFilter{
     std::vector<AbstractFilter *>sub_filters;
-    virtual void prepare(std::bitset<69> &x)const override final{
-        qDebug()<<"and filter";
+    /*virtual void prepare(std::bitset<69> &x)const override final{
         for(auto sub_filter:sub_filters)sub_filter->prepare(x);
-    }
+    }*/
     virtual bool filter(FilterContext *ctx)const override final{
         for(auto sub_filter:sub_filters){
             if(!sub_filter->filter(ctx))return false;
@@ -243,10 +265,9 @@ struct AndFilter:AbstractFilter{
 };
 struct OrFilter:AbstractFilter{
     std::vector<AbstractFilter *>sub_filters;
-    virtual void prepare(std::bitset<69> &x)const override final{
-        qDebug()<<"or filter";
+    /*virtual void prepare(std::bitset<69> &x)const override final{
         for(auto sub_filter:sub_filters)sub_filter->prepare(x);
-    }
+    }*/
     virtual bool filter(FilterContext *ctx)const override final{
         for(auto sub_filter:sub_filters){
             if(sub_filter->filter(ctx))return true;
@@ -257,18 +278,16 @@ struct OrFilter:AbstractFilter{
 };
 template<bool b>
 struct ConstantFilter:AbstractFilter{
-    virtual void prepare(std::bitset<69> &)const override final{
-        qDebug()<<"constant filter";
-    }
+    //virtual void prepare(std::bitset<69> &)const override final{}
     virtual bool filter(FilterContext *)const override final{
         return b;
     }
 };
 struct BoolFilter:AbstractFilter{
     FValue op;
-    virtual void prepare(std::bitset<69> &x)const override final{
+    /*virtual void prepare(std::bitset<69> &x)const override final{
         if(op.is_property())x.set(std::get<0>(op.val));
-    }
+    }*/
     virtual bool filter(FilterContext *ctx)const override final{
         if(!op.is_property()){
             return((std::get<1>(op.val).index()==3 && std::get<3>(std::get<1>(op.val)))==true);
@@ -283,10 +302,10 @@ struct CompareFilter:AbstractFilter{
     };
     COMPARE_OP operation;
     FValue op[2];
-    virtual void prepare(std::bitset<69> &x)const override final{
+    /*virtual void prepare(std::bitset<69> &x)const override final{
         if(op[0].is_property())x.set(std::get<0>(op[0].val));
         if(op[1].is_property())x.set(std::get<0>(op[1].val));
-    }
+    }*/
     virtual bool filter(FilterContext *ctx)const override final{
         if(op[0].value_type()!=op[1].value_type())
             return false;
@@ -393,5 +412,6 @@ inline AbstractFilter* compile(const std::string code){
     }else{
         return nullptr;
     }
+}
 }
 #endif // FILTER_HPP

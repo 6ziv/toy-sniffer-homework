@@ -228,3 +228,19 @@ QString get_tcp_option_name(uint8_t id) {
                                   tcp_option_tags[34].size());
   return "Reserved";
 }
+constexpr std::string_view icmp_typenames[] =
+{
+    "Echo reply","","","Destination Unreachable","Source Quench","Redirect Message","Alternate Host Address","","Echo Request","Router Advertisement",
+    "Router Solicitation","Time Exceeded","Parameter Problem:Bad IP Header","Timestamp","Timestamp Reply","Information Request","Information Reply",
+    "Address Mask Request","Address Mask Reply",
+    "Traceroute","Datagram Conversion Error","Mobile Host Redirect","Where Are You","Here I Am","Mobile Registration Request","Mobile Registration Reply",
+    "Domain Name Request","Domain Name Reply","Simple Key-Management for Internet Protocol","Photuris, Security failures","experimental mobility protocol",
+    "Extended Echo Request","Extended Echo Reply"
+};
+QString get_icmp_typename(uint8_t type){
+    QString ret;
+    if(type<19)ret= QString::fromLocal8Bit(icmp_typenames[type].data(),icmp_typenames[type].size());
+    else if(type>29 && type<44)return ret=QString::fromLocal8Bit(icmp_typenames[type-11].data(),icmp_typenames[type-11].size());
+    if(ret.isEmpty())ret=QString("ICMP Type %1").arg(static_cast<int>(type));
+    return ret;
+}

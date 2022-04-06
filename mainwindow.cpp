@@ -63,13 +63,14 @@ void MainWindow::packetArrival(long ts_sec, long ts_usec,
       new QTableWidgetItem(packet->get_comment(), QTableWidgetItem::Type));
     for(int i=0;i<7;i++)
         table->item(id,i)->setData(Qt::UserRole,id);
+  table->update();
   packets.emplace_back(timestamp, total_len, data);
 
   auto trace_info = Tracer::trace(packet);
   stream_id.push_back(trace_info);
 
   if(filter){
-    FilterContext * ctx= new FilterContext(reinterpret_cast<const PacketInterpreter::EthernetPacket *>(data.data()),packets.size(),timestamp-base_time.value(),mask);
+    Filter::FilterContext * ctx= new Filter::FilterContext(reinterpret_cast<const PacketInterpreter::EthernetPacket *>(data.data()),packets.size(),timestamp-base_time.value()/*,mask*/);
     bool show=filter->filter(ctx);
     delete ctx;
     if(!show)
@@ -82,7 +83,12 @@ void MainWindow::raiseError(QString text) {
   msgbox.exec();
   QApplication::exit(0);
 }
-void MainWindow::startCapture(QString friendly_name, QString adapter) {
+void MainWindow::raiseWarning(QString text) {
+  QMessageBox *msgbox = new QMessageBox(QMessageBox::Warning, tr("Warning"), text, QMessageBox::Ok,
+                     this);
+  msgbox->exec();
+}
+void MainWindow::startCapture(QString friendly_name, QString adapter, bool promisc, QString capture_filter) {
   base_time.reset();
   packets.clear();
 
@@ -92,12 +98,13 @@ void MainWindow::startCapture(QString friendly_name, QString adapter) {
 
   QPushButton *apply_filter = new QPushButton(this);
   apply_filter->setGeometry(this->width() - 110, 5, 90, 20);
-  apply_filter->setText("Apply");
+  apply_filter->setText(tr("Apply"));
   apply_filter->show();
 
   this->setWindowTitle(tr("Capturing on: ") + friendly_name);
-  SniffThread *sniff_thread = new SniffThread(adapter, this);
+  SniffThread *sniff_thread = new SniffThread(adapter, promisc, capture_filter, this);
   sniff_thread->start();
+
   QSplitter *splitter = new QSplitter(this);
   splitter->setGeometry(20, 50, this->width() - 40, this->height() - 70);
   splitter->setOrientation(Qt::Vertical);
@@ -190,15 +197,15 @@ void MainWindow::startCapture(QString friendly_name, QString adapter) {
           });
 
   connect(apply_filter,&QPushButton::clicked,this,[this,display_filter](){
-      filter = compile(display_filter->text().toStdString());
+      filter = Filter::compile(display_filter->text().toStdString());
       if(filter){
           display_filter->setStyleSheet("background-color:rgba(200,255,200,255)");
 
-      mask.reset();
-      filter->prepare(mask);
+      //mask.reset();
+      //filter->prepare(mask);
       for(uint64_t i=0;i<packets.size();i++){
-        FilterContext * ctx= new FilterContext(
-                    reinterpret_cast<const PacketInterpreter::EthernetPacket *>(std::get<2>(packets[i]).data()),i,std::get<0>(packets[i])-base_time.value(),mask);
+        Filter::FilterContext * ctx= new Filter::FilterContext(
+                    reinterpret_cast<const PacketInterpreter::EthernetPacket *>(std::get<2>(packets[i]).data()),i,std::get<0>(packets[i])-base_time.value()/*,mask*/);
         bool show=filter->filter(ctx);
         delete ctx;
         if(!show)
@@ -249,24 +256,57 @@ void MainWindow::startCapture(QString friendly_name, QString adapter) {
     std::vector<std::tuple<size_t,size_t,bool>> pkt_split;
     edit = new QHexEdit(nullptr);
     QBuffer* trace_bytes = new QBuffer(edit);
+    uint64_t expected_seq[2];
+    bool has_first_packet[2]={false,false};
     for(size_t i=0;i<packets.size();i++){
         if(stream_id[i].first != streamid)continue;
-        auto pkt = reinterpret_cast<const EthernetPacket*>(std::get<2>(packets[i]).data());
-        auto tcp_pkt = pkt->get_as<TCPPacket>();
+        auto pkt = reinterpret_cast<const PacketInterpreter::EthernetPacket*>(std::get<2>(packets[i]).data());
+        auto tcp_pkt = pkt->get_as<PacketInterpreter::TCPPacket>();
         if(tcp_pkt==nullptr)continue;
+        uint8_t my_side = stream_id[i].second?1:0;
+        if(!has_first_packet[my_side])expected_seq[my_side] = tcp_pkt->get_seq();
+        uint32_t expect_seq = expected_seq[my_side];
+        auto diff = static_cast<int32_t>(tcp_pkt->get_seq()-expect_seq);
+
         size_t tcp_pkt_payload_len = (
-                    pkt->get_as<IPv4Packet>()?
-                        (pkt->get_as<IPv4Packet>()->total_size() - pkt->get_as<IPv4Packet>()->header_size()):
-                        native_to_big(pkt->get_as<IPv6Packet>()->payload_len)
+                    pkt->get_as<PacketInterpreter::IPv4Packet>()?
+                        (pkt->get_as<PacketInterpreter::IPv4Packet>()->total_size() - pkt->get_as<PacketInterpreter::IPv4Packet>()->header_size()):
+                        native_to_big(pkt->get_as<PacketInterpreter::IPv6Packet>()->payload_len)
                         ) - tcp_pkt->header_size();
-        if(tcp_pkt_payload_len==0)continue;
-        pkt_split.emplace_back(trace_bytes->buffer().size(),
+
+        if(tcp_pkt_payload_len==0){
+            if(tcp_pkt->check_flag(PacketInterpreter::TCPPacket::TCPFLAG::SYN)) expected_seq[my_side]++;
+            continue;
+        }
+        if(diff>0){
+            //qDebug()<<"Missing "<<diff<<" bytes";
+            pkt_split.emplace_back(trace_bytes->buffer().size(),
+                                   tcp_pkt_payload_len+diff,
+                                   stream_id[i].second);
+            trace_bytes->buffer().append(static_cast<size_t>(diff),'\0');
+            trace_bytes->buffer().append(reinterpret_cast<const char*>(tcp_pkt->getload()),static_cast<size_t>(tcp_pkt_payload_len));
+        }
+        if(diff==0){
+            pkt_split.emplace_back(trace_bytes->buffer().size(),
                                tcp_pkt_payload_len,
                                stream_id[i].second);
-        trace_bytes->buffer().append(reinterpret_cast<const char*>(tcp_pkt->getload()),static_cast<size_t>(tcp_pkt_payload_len));
+            trace_bytes->buffer().append(reinterpret_cast<const char*>(tcp_pkt->getload()),static_cast<size_t>(tcp_pkt_payload_len));
+            expected_seq[my_side]+=tcp_pkt_payload_len;
+        }
+        if(diff<0){
+            //qDebug()<<"Resending "<<-diff<<" bytes";
+            if(-diff >= tcp_pkt_payload_len)continue;
+            int skip_bytes = tcp_pkt_payload_len + diff;
+            pkt_split.emplace_back(trace_bytes->buffer().size(),
+                               tcp_pkt_payload_len - skip_bytes,
+                               stream_id[i].second);
+            trace_bytes->buffer().append(reinterpret_cast<const char*>(tcp_pkt->getload()+skip_bytes),static_cast<size_t>(tcp_pkt_payload_len)-skip_bytes);
+            expected_seq[my_side]+=tcp_pkt_payload_len - skip_bytes;
+        }
     }
     trace_bytes->open(QBuffer::ReadOnly);
     QHexDocument* doc = QHexDocument::fromDevice(trace_bytes);
+    doc->setParent(edit);
     edit->setDocument(doc);
     edit->setReadOnly(true);
     doc->beginMetadata();
@@ -287,8 +327,8 @@ void MainWindow::startCapture(QString friendly_name, QString adapter) {
       QBuffer* trace_bytes = new QBuffer(edit);
       for(size_t i=0;i<packets.size();i++){
           if(stream_id[i].first != streamid)continue;
-          auto pkt = reinterpret_cast<const EthernetPacket*>(std::get<2>(packets[i]).data());
-          auto udp_pkt = pkt->get_as<UDPPacket>();
+          auto pkt = reinterpret_cast<const PacketInterpreter::EthernetPacket*>(std::get<2>(packets[i]).data());
+          auto udp_pkt = pkt->get_as<PacketInterpreter::UDPPacket>();
           if(udp_pkt==nullptr)continue;
           size_t udp_pkt_payload_len = udp_pkt->total_len()- udp_pkt->header_size();
           if(udp_pkt_payload_len==0)continue;
@@ -299,6 +339,7 @@ void MainWindow::startCapture(QString friendly_name, QString adapter) {
       }
       trace_bytes->open(QBuffer::ReadOnly);
       QHexDocument* doc = QHexDocument::fromDevice(trace_bytes);
+      doc->setParent(edit);
       edit->setDocument(doc);
       edit->setReadOnly(true);
       doc->beginMetadata();

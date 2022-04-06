@@ -88,7 +88,24 @@ public:
   }
   inline size_t header_size() const { return sizeof(*this); }
 };
+class ICMPPacket:public ICMPHeader{
 
+public:
+    inline QString get_comment()const{
+        return get_icmp_typename(this->type);
+    }
+    inline std::deque<std::pair<std::wstring, my_ptree>>
+    get_details(size_t offset = 0) const {
+        std::deque<std::pair<std::wstring, my_ptree>> ret;
+        PacketInterpreter::my_ptree tree;
+        TREE_ADD(Type, QString::number(type), type);
+        TREE_ADD(Code, QString::number(subtype), subtype);
+        TREE_ADD(CRC, QString::number(native_to_big(checksum),16).rightJustified(4,'0'),checksum);
+        TREE_ADD(Rest Of Header, QString::number(native_to_big(rest_of_header),16).rightJustified(8,'0'),rest_of_header);
+        ret.emplace_front(L"Internet Control Message Protocol",tree);
+        return ret;
+    }
+};
 class TCPPacket : public TCPHeader {
 public:
   inline QString get_comment2(uint16_t packet_size) const {
@@ -173,7 +190,7 @@ public:
       TREE_ADD(Urgent Pointer, QString::number(native_to_big(urgent_pointer)),
                urgent_pointer);
     }
-    uint16_t pktend_ptr = this->header_size();
+    uint16_t pktend_ptr = static_cast<uint16_t>(this->header_size());
     uint16_t current_ptr = sizeof(TCPHeader);
     const uint8_t *asbyte = reinterpret_cast<const uint8_t *>(this);
     my_ptree options;
@@ -207,7 +224,6 @@ public:
   }
 };
 
-class ICMPPacket;
 class IPv4Packet : public Ipv4Header {
 public:
   inline COMMONADDR get_source() const {
@@ -236,6 +252,8 @@ public:
     if (this->get_as<TCPPacket>())
       return this->get_as<TCPPacket>()->get_comment2(total_size() -
                                                      header_size());
+    if(this->get_as<ICMPPacket>())
+        return this->get_as<ICMPPacket>()->get_comment();
     return QString();
   }
   std::deque<std::pair<std::wstring, my_ptree>>
@@ -308,6 +326,8 @@ public:
     if (get_as<TCPPacket>())
       ret = get_as<TCPPacket>()->get_details2(total_size() - header_size(),
                                               offset + this->header_size());
+    if(get_as<ICMPPacket>())
+        return get_as<ICMPPacket>()->get_details(offset+this->header_size());
     ret.emplace_front(L"Internet Protocol Version 4", tree);
     return ret;
   }

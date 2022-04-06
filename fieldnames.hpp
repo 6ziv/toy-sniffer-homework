@@ -72,6 +72,16 @@ std::map<const std::string,uint8_t> name_to_id=
     {"tcp.flags.ns",65},
     {"tcp.window",66},
     {"tcp.crc",67},
-    {"tcp.urgent_pointer",68}
+    {"tcp.urgent_pointer",68},
+    {"rarp",69},
+    {"snmp",70},
+    {"ieee802_1q",71},
+    {"ieee802_1x",72},
+    {"icmp",73},
+    {"icmp.type",74},
+    {"icmp.code",75},
+    {"icmp.crc",76},
+    {"icmp.rest_of_header",77},
 };
+constexpr size_t count_fieldnames = 78;
 #endif // FIELDNAMES_HPP

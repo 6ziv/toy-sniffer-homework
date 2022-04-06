@@ -7,7 +7,9 @@
 #include <QMessageBox>
 #include <QTranslator>
 #include <pcap.h>
-
+#include <QCheckBox>
+#include <QLineEdit>
+#include <QFontMetrics>
 #include "qdebug.h"
 AdapterSelector::AdapterSelector(QWidget *parent) : QWidget(parent) {
   this->resize(1200, 800);
@@ -24,6 +26,25 @@ AdapterSelector::AdapterSelector(QWidget *parent) : QWidget(parent) {
   list->setGeometry(100, 100, 1000, 650);
   list->show();
 
+  QLabel *labPromisc=new QLabel(this);
+  int width = QFontMetrics(labPromisc->font()).horizontalAdvance(tr("run in promiscuous mode:"));
+  labPromisc->setGeometry(100,755,width+5,20);
+  labPromisc->setText(tr("run in promiscuous mode:"));
+  labPromisc->show();
+
+  QCheckBox* promisc = new QCheckBox(this);
+  promisc->setGeometry(100+width+5,757,15,15);
+  promisc->show();
+
+  QLabel * labCF = new QLabel(this);
+  labCF->setGeometry(100+width+25 + 30,755,100,15);
+  labCF->setText(tr("Capture Filter:"));
+  labCF->setAlignment(Qt::AlignRight);
+  labCF->show();
+
+  QLineEdit* capture_filter = new QLineEdit(this);
+  capture_filter->setGeometry(100+width+25+150,755,1000-100-(100+width+25)-10,15);
+  capture_filter->show();
   auto adapters = ListHelper::list_adapters();
 
   if (adapters.empty()) {
@@ -51,12 +72,15 @@ AdapterSelector::AdapterSelector(QWidget *parent) : QWidget(parent) {
         Qt::UserRole,
         QStringList({adapter, QString::fromStdString(adapters[adapter])}));
   }
+  auto vals = adapters.values();
   for (int i = 0; i < adapters.size(); i++) {
-    workers.push_back(new StatThread(adapters.values()[i], i, this));
+    workers.emplace_back(
+                new StatThread(vals[i], i, this)
+                );
     workers.back()->start();
   }
   connect(list, &QListWidget::itemDoubleClicked, this,
-          [this](QListWidgetItem *item) {
+          [this,promisc,capture_filter](QListWidgetItem *item) {
             // qDebug()<<"Selected:"<<item->data(Qt::UserRole);
             StatThread::is_finished = true;
             for (auto worker : workers) {
@@ -65,7 +89,8 @@ AdapterSelector::AdapterSelector(QWidget *parent) : QWidget(parent) {
             auto data = item->data(Qt::UserRole).toStringList();
             QMetaObject::invokeMethod(
                 this->parent(), "startCapture", Qt::DirectConnection,
-                Q_ARG(QString, data[0]), Q_ARG(QString, data[1]));
+                Q_ARG(QString, data[0]), Q_ARG(QString, data[1]),Q_ARG(bool,promisc->isChecked()),Q_ARG(QString,capture_filter->text())
+                    );
             this->deleteLater();
           });
 }

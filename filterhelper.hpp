@@ -28,10 +28,10 @@ namespace filter {
                         this->push_back(x.address[i] / 256);
                         this->push_back(x.address[i] % 256);
                     }
-                    for (int i = x.address.size(); i < 8; i++) {
+                    for (size_t i = x.address.size(); i < 8; i++) {
                         this->push_back(0); this->push_back(0);
                     }
-                    for (int i = x.insert_position; i < x.address.size(); i++) {
+                    for (size_t i = x.insert_position; i < x.address.size(); i++) {
                         this->push_back(x.address[i] / 256);
                         this->push_back(x.address[i] % 256);
                     }
@@ -132,7 +132,7 @@ namespace filter
         auto const ipv6_constant_def =
             (
                 (!(x3::hex[([](auto& ctx) {x3::_val(ctx).address.push_back(x3::_attr(ctx)); })] % ':')) >>
-                x3::lit("::")[([](auto& ctx) {x3::_val(ctx).insert_position = x3::_val(ctx).address.size(); })] >>
+                x3::lit("::")[([](auto& ctx) {x3::_val(ctx).insert_position = static_cast<int>(x3::_val(ctx).address.size()); })] >>
                 (!(x3::hex[([](auto& ctx) {x3::_val(ctx).address.push_back(x3::_attr(ctx)); })] % ':'))
                 ) |
 

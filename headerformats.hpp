@@ -61,6 +61,13 @@ typedef struct {
   uint16_t opcode;
 } ARPHeader;
 
+typedef struct{
+    uint8_t type;
+    uint8_t subtype;
+    uint16_t checksum;
+    uint32_t rest_of_header;
+} ICMPHeader;
+
 constexpr uint16_t IPV4 = native_to_big<uint16_t>(0x0800);
 constexpr uint16_t IPV6 = native_to_big<uint16_t>(0x86DD);
 constexpr uint16_t IEEE802_1Q = native_to_big<uint16_t>(0x8100);
