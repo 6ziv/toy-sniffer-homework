@@ -4,3 +4,6 @@
 [submodule "span_ext"]
 	path = span_ext
 	url = https://github.com/brevzin/span_ext.git
+[submodule "QHexEdit"]
+	path = QHexEdit
+	url = https://github.com/0x4e38/QHexEdit.git
