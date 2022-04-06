@@ -4,7 +4,8 @@ CONFIG += c++2a
 # You can make your code fail to compile if it uses deprecated APIs.
 # In order to do so, uncomment the following line.
 #DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
-include(QHexEdit/QHexEdit.pri)
+include($$PWD/QHexEdit/QHexEdit.pri)
+include($$PWD/boost/boost.pri)
 SOURCES += \
     adapterselector.cpp \
     listhelper.cpp \
@@ -42,10 +43,9 @@ TRANSLATIONS += \
 CONFIG += lrelease
 CONFIG += embed_translations
 INCLUDEPATH += E:\npcap-sdk-1.12\Include
-INCLUDEPATH += C:\boost_1_78_0
-INCLUDEPATH += D:\aixlog-1.5.0\include
-INCLUDEPATH += QHexView/include
-INCLUDEPATH += span_ext/include
+INCLUDEPATH += $$PWD/QHexView/include
+INCLUDEPATH += $$PWD/span_ext/include
+INCLUDEPATH += $$PWD/aixlog/include
 LIBPATH += E:\npcap-sdk-1.12\Lib\x64
 LIBS += Packet.lib wpcap.lib
 LIBS += Iphlpapi.lib
