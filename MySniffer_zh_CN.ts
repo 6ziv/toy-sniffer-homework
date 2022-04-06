@@ -59,7 +59,7 @@
     <message>
         <location filename="mainwindow.cpp" line="84"/>
         <source>Length</source>
-        <translation>负载长度</translation>
+        <translation>长度</translation>
     </message>
     <message>
         <location filename="mainwindow.cpp" line="84"/>

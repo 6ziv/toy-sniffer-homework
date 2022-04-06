@@ -145,9 +145,10 @@ class FilterContext
     const EthernetPacket* ethernet_header=nullptr;
     std::map<uint8_t,FilterValue> data;
 
+    uint64_t no,timestamp;
 public:
     FilterContext(const EthernetPacket* p,uint64_t id,uint64_t ts,const std::bitset<69>& mask):
-        ethernet_header(p)
+        ethernet_header(p),no(id),timestamp(ts)
     {
         arp_header = ethernet_header->get_as<ARPPacket>();
         ipv4_header = ethernet_header->get_as<IPv4Packet>();
@@ -168,12 +169,15 @@ public:
     };
     inline FilterValue getVal(uint8_t type)
     {
+        if(type==0)return no;
+        if(type==1)return timestamp;
         if(type<6)return lookup<EthernetPacket>(type);
         if(type<16)return lookup<ARPPacket>(type);
         if(type<32)return lookup<IPv4Packet>(type);
         if(type<44)return lookup<IPv6Packet>(type);
         if(type<50)return lookup<UDPPacket>(type);
         if(type<69)return lookup<TCPPacket>(type);
+        return std::monostate();
 /*
  * this should be faster in theory
  * but seems I've made a faulty implementation

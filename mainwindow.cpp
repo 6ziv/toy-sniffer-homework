@@ -7,13 +7,18 @@
 #include <QApplication>
 #include <QHeaderView>
 #include <QHexView.h>
+#include <QBuffer>
 #include <QLabel>
 #include <QLineEdit>
 #include <QMessageBox>
 #include <QPushButton>
 #include <QSplitter>
 #include <QVBoxLayout>
+#include <QMenu>
+#include <QPair>
+#include <QColor>
 #include <optional>
+#include <qhexedit.h>
 #include "filter.hpp"
 MainWindow::MainWindow(QWidget *parent) : QWidget{parent} {
   this->resize(1200, 800);
@@ -56,9 +61,12 @@ void MainWindow::packetArrival(long ts_sec, long ts_usec,
   table->setItem(
       id, 6,
       new QTableWidgetItem(packet->get_comment(), QTableWidgetItem::Type));
+    for(int i=0;i<7;i++)
+        table->item(id,i)->setData(Qt::UserRole,id);
   packets.emplace_back(timestamp, total_len, data);
 
-  stream_id.push_back(Tracer::trace(packet));
+  auto trace_info = Tracer::trace(packet);
+  stream_id.push_back(trace_info);
 
   if(filter){
     FilterContext * ctx= new FilterContext(reinterpret_cast<const PacketInterpreter::EthernetPacket *>(data.data()),packets.size(),timestamp-base_time.value(),mask);
@@ -78,8 +86,6 @@ void MainWindow::startCapture(QString friendly_name, QString adapter) {
   base_time.reset();
   packets.clear();
 
-  for(int i=0;i<69;i++)
-      if(mask[i])qDebug()<<"ACCESSED:"<<i;
   QLineEdit *display_filter = new QLineEdit(this);
   display_filter->setGeometry(20, 5, this->width() - 150, 20);
   display_filter->show();
@@ -206,5 +212,139 @@ void MainWindow::startCapture(QString friendly_name, QString adapter) {
       if(display_filter->text().isEmpty()){
           display_filter->setStyleSheet("background-color:rgba(255,255,255,255)");
       }
+  });
+
+  table->setContextMenuPolicy(Qt::CustomContextMenu);
+  QMenu *menu = new QMenu(table);
+  QMenu* filter_menu = menu->addMenu(tr("Filter"));
+  not_later = filter_menu->addAction(tr("No later than"),this,[display_filter,apply_filter,this](){
+      display_filter->setText(not_later->data().toString());
+      apply_filter->click();
+  });
+  not_earlier = filter_menu->addAction(tr("No earlier than"),this,[display_filter,apply_filter,this](){
+      display_filter->setText(not_earlier->data().toString());
+      apply_filter->click();
+  });
+  filter_menu->addSeparator();
+  is_eth = filter_menu->addAction("Ethernet",this,[display_filter,apply_filter](){display_filter->setText("ethernet");apply_filter->click();});
+  is_arp = filter_menu->addAction("ARP",this,[display_filter,apply_filter](){display_filter->setText("arp");apply_filter->click();});
+  is_ipv4 = filter_menu->addAction("IPv4",this,[display_filter,apply_filter](){display_filter->setText("ipv4");apply_filter->click();});
+  is_ipv6 = filter_menu->addAction("IPv6",this,[display_filter,apply_filter](){display_filter->setText("ipv6");apply_filter->click();});
+  is_tcp = filter_menu->addAction("TCP",this,[display_filter,apply_filter](){display_filter->setText("tcp");apply_filter->click();});
+  is_udp = filter_menu->addAction("UDP",this,[display_filter,apply_filter](){display_filter->setText("udp");apply_filter->click();});
+  filter_menu->addSeparator();
+  source_ip_address = filter_menu->addAction(tr("Source IP Address"),this,[display_filter,apply_filter,this](){
+      display_filter->setText(source_ip_address->data().toString());
+      apply_filter->click();
+  });
+  destination_ip_address = filter_menu->addAction(tr("Destination IP Address"),this,[display_filter,apply_filter,this](){
+      display_filter->setText(destination_ip_address->data().toString());
+      apply_filter->click();
+  });
+
+  QMenu* trace_menu = menu->addMenu(tr("Trace"));
+  trace_tcp_stream = trace_menu->addAction(tr("TCP stream"),this,[this](){
+    if(edit)edit->deleteLater();
+    auto streamid = trace_tcp_stream->data().toULongLong();
+    std::vector<std::tuple<size_t,size_t,bool>> pkt_split;
+    edit = new QHexEdit(nullptr);
+    QBuffer* trace_bytes = new QBuffer(edit);
+    for(size_t i=0;i<packets.size();i++){
+        if(stream_id[i].first != streamid)continue;
+        auto pkt = reinterpret_cast<const EthernetPacket*>(std::get<2>(packets[i]).data());
+        auto tcp_pkt = pkt->get_as<TCPPacket>();
+        if(tcp_pkt==nullptr)continue;
+        size_t tcp_pkt_payload_len = (
+                    pkt->get_as<IPv4Packet>()?
+                        (pkt->get_as<IPv4Packet>()->total_size() - pkt->get_as<IPv4Packet>()->header_size()):
+                        native_to_big(pkt->get_as<IPv6Packet>()->payload_len)
+                        ) - tcp_pkt->header_size();
+        if(tcp_pkt_payload_len==0)continue;
+        pkt_split.emplace_back(trace_bytes->buffer().size(),
+                               tcp_pkt_payload_len,
+                               stream_id[i].second);
+        trace_bytes->buffer().append(reinterpret_cast<const char*>(tcp_pkt->getload()),static_cast<size_t>(tcp_pkt_payload_len));
+    }
+    trace_bytes->open(QBuffer::ReadOnly);
+    QHexDocument* doc = QHexDocument::fromDevice(trace_bytes);
+    edit->setDocument(doc);
+    edit->setReadOnly(true);
+    doc->beginMetadata();
+    for(const auto& slice:pkt_split){
+        doc->highlightBackRange(std::get<0>(slice),std::get<1>(slice),std::get<2>(slice)?QColor(255,225,225):QColor(225,225,255));
+    }
+    doc->endMetadata();
+    edit->show();
+  });
+  trace_udp_stream = trace_menu->addAction(tr("UDP stream"),this,[this](){
+      if(edit)
+        edit->deleteLater();
+
+      auto streamid = trace_udp_stream->data().toULongLong();
+      std::vector<std::tuple<size_t,size_t,bool>> pkt_split;
+
+      edit = new QHexEdit(nullptr);
+      QBuffer* trace_bytes = new QBuffer(edit);
+      for(size_t i=0;i<packets.size();i++){
+          if(stream_id[i].first != streamid)continue;
+          auto pkt = reinterpret_cast<const EthernetPacket*>(std::get<2>(packets[i]).data());
+          auto udp_pkt = pkt->get_as<UDPPacket>();
+          if(udp_pkt==nullptr)continue;
+          size_t udp_pkt_payload_len = udp_pkt->total_len()- udp_pkt->header_size();
+          if(udp_pkt_payload_len==0)continue;
+          pkt_split.emplace_back(trace_bytes->buffer().size(),
+                                 udp_pkt_payload_len,
+                                 stream_id[i].second);
+          trace_bytes->buffer().append(reinterpret_cast<const char*>(udp_pkt->getload()),static_cast<size_t>(udp_pkt_payload_len));
+      }
+      trace_bytes->open(QBuffer::ReadOnly);
+      QHexDocument* doc = QHexDocument::fromDevice(trace_bytes);
+      edit->setDocument(doc);
+      edit->setReadOnly(true);
+      doc->beginMetadata();
+      for(const auto& slice:pkt_split){
+          doc->highlightBackRange(std::get<0>(slice),std::get<1>(slice),std::get<2>(slice)?QColor(255,225,225):QColor(225,225,255));
+      }
+      doc->endMetadata();
+      edit->show();
+  });
+  table->connect(table,&QTableWidget::customContextMenuRequested,table,[=](const QPoint& pt){
+      auto id = table->itemAt(pt)->data(Qt::UserRole).toULongLong();
+      auto pkt = reinterpret_cast<const PacketInterpreter::EthernetPacket*>(std::get<2>(packets[id]).data());
+      not_later->setData(QString("no <= %1").arg(id));
+      not_earlier->setData(QString("no >= %1").arg(id));
+
+      is_eth->setEnabled(true);
+      is_arp->setEnabled(pkt->get_as<PacketInterpreter::ARPPacket>()!=nullptr);
+      is_ipv4->setEnabled(pkt->get_as<PacketInterpreter::IPv4Packet>()!=nullptr);
+      is_ipv6->setEnabled(pkt->get_as<PacketInterpreter::IPv6Packet>()!=nullptr);
+      is_tcp->setEnabled(pkt->get_as<PacketInterpreter::TCPPacket>()!=nullptr);
+      is_udp->setEnabled(pkt->get_as<PacketInterpreter::UDPPacket>()!=nullptr);
+
+      if(pkt->get_as<PacketInterpreter::IPv4Packet>()!=nullptr){
+          source_ip_address->setEnabled(true);
+          source_ip_address->setData(QString("ipv4.source == ")+PacketInterpreter::addr2Str(pkt->get_as<PacketInterpreter::IPv4Packet>()->get_source()));
+          destination_ip_address->setEnabled(true);
+          destination_ip_address->setData(QString("ipv4.destination == ")+PacketInterpreter::addr2Str(pkt->get_as<PacketInterpreter::IPv4Packet>()->get_destination()));
+      }else if(pkt->get_as<PacketInterpreter::IPv6Packet>()!=nullptr){
+          source_ip_address->setEnabled(true);
+          source_ip_address->setData(QString("ipv6.source == ")+PacketInterpreter::addr2Str(pkt->get_as<PacketInterpreter::IPv6Packet>()->get_source()));
+          destination_ip_address->setEnabled(true);
+          destination_ip_address->setData(QString("ipv6.destination == ")+PacketInterpreter::addr2Str(pkt->get_as<PacketInterpreter::IPv6Packet>()->get_destination()));
+      }
+      else{
+          source_ip_address->setEnabled(false);
+          destination_ip_address->setEnabled(false);
+      }
+
+      if(pkt->get_as<PacketInterpreter::TCPPacket>()!=nullptr){
+        trace_tcp_stream->setEnabled(true);
+        trace_tcp_stream->setData(stream_id[id].first);
+      }else trace_tcp_stream->setEnabled(false);
+      if(pkt->get_as<PacketInterpreter::UDPPacket>()!=nullptr){
+        trace_udp_stream->setEnabled(true);
+        trace_tcp_stream->setData(stream_id[id].first);
+      }else trace_udp_stream->setEnabled(false);
+    menu->popup(table->mapToGlobal(pt));
   });
 }
