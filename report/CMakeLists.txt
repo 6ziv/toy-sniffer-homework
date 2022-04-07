@@ -6,7 +6,7 @@ if(PANDOC)
 	cmake_path(CONVERT "${CMAKE_CURRENT_BINARY_DIR}/report.pdf" TO_NATIVE_PATH_LIST REPORT_PDF NORMALIZE)
 	add_custom_command(
 		OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/report.pdf"
-		COMMAND "${PANDOC}" --pdf-engine=xelatex -V mainfont="SimSun" -f markdown "${REPORT_MD}" -o "${REPORT_PDF}"
+		COMMAND "${PANDOC}" --pdf-engine=xelatex -V CJKmainfont="SimSun" -f markdown "${REPORT_MD}" -o "${REPORT_PDF}"
 		WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} 
 		USES_TERMINAL
 	)

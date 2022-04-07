@@ -29,9 +29,9 @@ jobs:
             iftex
             listings
             fancyvrb
-            longtable
+            tools
             booktabs
-            graphicx
+            graphics
             hyperref
             xcolor
             ulem
@@ -51,7 +51,7 @@ jobs:
             xurl
             bookmark
             footnotehyper
-            footnote
+            mdwtools
             natbib
             biblatex
             bibtex
