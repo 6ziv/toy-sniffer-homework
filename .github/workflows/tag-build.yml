@@ -19,7 +19,7 @@ jobs:
           cmake-version: '3.22.x'
       - uses: teatimeguest/setup-texlive-action@v2.0.2
         with:
-          version: '2020'
+          version: 'latest'
           packages: >-
             xelatex-dev
             amsfonts
