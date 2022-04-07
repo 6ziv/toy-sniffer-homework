@@ -23,7 +23,7 @@ jobs:
           path: project
           submodules: 'recursive'
       - run: New-Item C:\build -ItemType Directory
-        working-directory C:\
+        working-directory: C:\
       - run: cmake -GNinja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=C:\sniffer $env:GITHUB_WORKSPACE\project\code
       - run: cmake --build . --parallel
       - run: cmake --install .
