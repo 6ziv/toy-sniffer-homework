@@ -22,6 +22,39 @@ jobs:
           version: '2020'
           packages: >-
             xelatex-dev
+            amsfonts
+            amsmath
+            lm
+            unicode-math
+            iftex
+            listings
+            fancyvrb
+            longtable
+            booktabs
+            graphicx
+            hyperref
+            xcolor
+            ulem
+            geometry
+            setspace
+            babel
+            xeCJK
+            fontspec
+            mathspec
+            bidi
+            unicode-math
+            upquote
+            microtype
+            csquotes
+            parskip
+            xurl
+            bookmark
+            footnotehyper
+            footnote
+            natbib
+            biblatex
+            bibtex
+            biber
       - uses: nikeee/setup-pandoc@v1
       - uses: jurplel/install-qt-action@v2
         with:
