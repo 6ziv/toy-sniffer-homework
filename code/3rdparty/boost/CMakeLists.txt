@@ -1,0 +1,5 @@
+cmake_minimum_required(VERSION 3.20)
+project(boost CXX)
+set(CMAKE_CXX_STANDARD 20)
+add_library(boost INTERFACE)
+target_include_directories(boost INTERFACE ${CMAKE_CURRENT_SOURCE_DIR})
