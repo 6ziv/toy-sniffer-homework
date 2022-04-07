@@ -19,7 +19,7 @@ jobs:
           cmake-version: '3.22.x'
       - uses: teatimeguest/setup-texlive-action@v2.0.2
         with:
-          version: '2021'
+          version: '2020'
       - uses: nikeee/setup-pandoc@v1
       - uses: jurplel/install-qt-action@v2
         with:
@@ -32,7 +32,7 @@ jobs:
         with: 
           path: project
           submodules: 'recursive'
-      - run: cmake -GNinja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=C:\sniffer $env:GITHUB_WORKSPACE\project
+      - run: cmake -GNinja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=C:\Qt\6.2.1\msvc2019_64 -DCMAKE_INSTALL_PREFIX=C:\sniffer $env:GITHUB_WORKSPACE\project
       - run: cmake --build . --parallel
       - run: cmake --install .
       - run: cmake -E tar "cfv" C:\sniffer.zip --format=zip C:\sniffer
