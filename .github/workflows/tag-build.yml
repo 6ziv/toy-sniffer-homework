@@ -22,6 +22,10 @@ jobs:
         with: 
           path: project
           submodules: 'recursive'
+      - uses: ilammy/msvc-dev-cmd@v1
+        with: 
+          arch: x64
+          spectre: true
       - run: New-Item C:\build -ItemType Directory
         working-directory: C:\
       - run: cmake -GNinja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=C:\sniffer $env:GITHUB_WORKSPACE\project\code
