@@ -73,7 +73,7 @@ jobs:
       - run: cmake --build . --parallel
       - run: cmake --install .
       - run: cmake -E tar "cfv" C:\sniffer.zip --format=zip C:\sniffer
-          working-directory: C:\
+        working-directory: C:\
       - uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
         with:
