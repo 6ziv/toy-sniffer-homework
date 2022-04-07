@@ -67,7 +67,18 @@ set_target_properties(MySniffer PROPERTIES
     MACOSX_BUNDLE TRUE
     WIN32_EXECUTABLE TRUE
 )
-target_link_libraries(MySniffer PRIVATE Iphlpapi.lib)
+target_link_libraries(MySniffer PRIVATE Iphlpapi.lib Delayimp.lib)
+set_target_properties(MySniffer PROPERTIES LINK_FLAGS "/MANIFESTUAC:\"level='requireAdministrator' uiAccess='false'\" /DELAYLOAD:wpcap.dll")
+
+install(TARGETS MySniffer DESTINATION ./bin)
+find_program(TOOL_WINDEPLOYQT NAMES windeployqt PATHS "${QT_DIR}/bin")
+install(CODE
+    "execute_process(COMMAND \"${CMAKE_COMMAND}\" -E
+        env PATH=\"${_qt_bin_dir}\" \"${WINDEPLOYQT_EXECUTABLE}\"
+            --verbose 0
+            --no-compiler-runtime
+            \"${CMAKE_INSTALL_PREFIX}/bin/\")"
+)
 if(QT_VERSION_MAJOR EQUAL 6)
     qt_finalize_executable(MySniffer)
 endif()
