@@ -56,6 +56,7 @@ jobs:
             biblatex
             bibtex
             biber
+            ctex
       - uses: nikeee/setup-pandoc@v1
       - uses: jurplel/install-qt-action@v2
         with:
