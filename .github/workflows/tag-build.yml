@@ -20,6 +20,8 @@ jobs:
       - uses: teatimeguest/setup-texlive-action@v2.0.2
         with:
           version: '2020'
+          packages: >-
+            xelatex-dev
       - uses: nikeee/setup-pandoc@v1
       - uses: jurplel/install-qt-action@v2
         with:
