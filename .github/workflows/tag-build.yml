@@ -11,10 +11,6 @@ jobs:
       - uses: jwlawson/actions-setup-cmake@v1.9
         with: 
           cmake-version: '3.22.x'
-      - uses: teatimeguest/setup-texlive-action@v2.0.2
-        with:
-          version: '2021'
-      - uses: nikeee/setup-pandoc@v1
       - uses: jurplel/install-qt-action@v2
         with:
           version: '6.2.0'
@@ -26,9 +22,18 @@ jobs:
         with: 
           path: project
           submodules: 'recursive'
-      - run: cmake -GNinja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=C:\sniffer $env:GITHUB_WORKSPACE\project
+      - run: cmake -GNinja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=C:\sniffer $env:GITHUB_WORKSPACE\project\code
       - run: cmake --build . --parallel
       - run: cmake --install .
+      - run: cmake -E make_directory C:\sniffer\doc
+      - uses: docker://pandoc/core:2.18
+        with:
+          args: >-
+             --pdf-engine=xelatex
+             -V CJKmainfont="SimSun"
+             -f markdown
+             $env:GITHUB_WORKSPACE\project\report\report.md
+             -o C:\sniffer\doc\report.pdf
       - run: cmake -E tar "cfv" C:\sniffer.zip --format=zip C:\sniffer
       - uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
