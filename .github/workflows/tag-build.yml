@@ -22,7 +22,6 @@ jobs:
           target: 'desktop'
           arch: 'win64_msvc2019_64'
           dir: 'C:\'
-        working-directory: C:\
       - uses: teatimeguest/setup-texlive-action@v2
       - uses: nikeee/setup-pandoc@v1
       - run: cmake -GNinja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=C:\sniffer $env:GITHUB_WORKSPACE\project
