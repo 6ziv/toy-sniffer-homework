@@ -38,11 +38,12 @@ jobs:
             geometry
             setspace
             babel
-            xeCJK
+            xecjk
             fontspec
             mathspec
             bidi
             unicode-math
+            infwarerr
             upquote
             microtype
             csquotes
