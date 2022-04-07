@@ -22,10 +22,12 @@ jobs:
         with: 
           path: project
           submodules: 'recursive'
+      - run: New-Item C:\build -ItemType Directory
+        working-directory C:\
       - run: cmake -GNinja -DCMAKE_BUILD_TYPE=Release -DCMAKE_PREFIX_PATH=C:\sniffer $env:GITHUB_WORKSPACE\project\code
       - run: cmake --build . --parallel
       - run: cmake --install .
-      - run: cmake -E make_directory C:\sniffer\doc
+      - run: New-Item C:\sniffer\doc -ItemType Directory
       - uses: docker://pandoc/core:2.18
         with:
           args: >-
